@@ -116,8 +116,17 @@
         import { getFirestore, doc, getDoc, setDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "dummy", authDomain: "dummy.firebaseapp.com", projectId: "dummy" };
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : undefined;
+       // ... inside the script tag ...
+const firebaseConfig = {
+  apiKey: "AIzaSyBSGdQ0CwkpmZV1vtP8fsrnzm8Xc3fLlVI",
+  authDomain: "my-workout-log-288a6.firebaseapp.com",
+  projectId: "my-workout-log-288a6",
+  storageBucket: "my-workout-log-288a6.firebasestorage.app",
+  messagingSenderId: "947649300401",
+  appId: "1:947649300401:web:35c94929031ba12e9cdf90"
+};
+const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : undefined;
+// ... rest of the codeconst initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : undefined;
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
