@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customizable Workout Log</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom scrollbar for better aesthetics */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #2d3748;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4a5568;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #718096;
+        }
+        /* Simple focus styles */
+        .form-input:focus, .editor-input:focus {
+            ring: 2px;
+            ring-offset: 2px;
+            box-shadow: 0 0 0 2px #2d3748;
+            border-color: #6366f1;
+            outline: none;
+        }
+        #plan-editor-modal {
+            transition: opacity 0.3s ease;
+        }
+        .modal-content {
+            max-height: 85vh;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200 antialiased">
+
+    <div id="app" class="container mx-auto p-4 md:p-6 lg:p-8 max-w-7xl">
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <h1 id="plan-name-header" class="text-3xl md:text-4xl font-bold text-white tracking-tight">Workout Log</h1>
+            <p class="text-gray-400 mt-2">Your customizable workout tracker</p>
+        </header>
+
+        <!-- Week Navigation and Save -->
+        <div class="flex justify-between items-center mb-6 bg-gray-800 p-3 rounded-lg shadow-md sticky top-4 z-10">
+            <button id="prev-week" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-md font-semibold transition-colors duration-200">&lt; Prev</button>
+            <div class="text-center">
+                <h2 id="week-title" class="text-xl font-bold">Week 1</h2>
+                <p id="week-dates" class="text-sm text-gray-400">Loading...</p>
+            </div>
+            <button id="next-week" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-md font-semibold transition-colors duration-200">Next &gt;</button>
+        </div>
+        <div class="flex justify-center items-center gap-4 mb-6">
+             <button id="save-data" class="w-full sm:w-auto px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-lg transition-all duration-200 transform hover:scale-105">
+                Save Progress
+            </button>
+             <button id="edit-plan-btn" class="w-full sm:w-auto px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-lg transition-all duration-200 transform hover:scale-105">
+                Edit Plan
+            </button>
+        </div>
+        <div id="status-message" class="text-center mb-4 h-6"></div>
+        <div id="user-id-container" class="text-center mb-4 text-xs text-gray-500"></div>
+
+        <!-- Loading Spinner -->
+        <div id="loader" class="text-center py-10">
+            <svg class="animate-spin h-8 w-8 text-white mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="mt-2">Loading data...</p>
+        </div>
+
+        <!-- Workout Grid -->
+        <main id="workout-grid" class="hidden grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
+            <!-- Workout Day Cards will be inserted here by JavaScript -->
+        </main>
+    </div>
+
+    <!-- Plan Editor Modal -->
+    <div id="plan-editor-modal" class="hidden fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4">
+        <div class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-3xl modal-content">
+            <div class="p-6 border-b border-gray-700">
+                <h2 class="text-2xl font-bold text-white">Edit Workout Plan</h2>
+            </div>
+            <div class="p-6 overflow-y-auto">
+                <div class="mb-6">
+                    <label for="plan-name-input" class="block text-sm font-medium text-gray-300 mb-2">Plan Name</label>
+                    <input type="text" id="plan-name-input" class="editor-input w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-white" placeholder="e.g., My Push Pull Legs">
+                </div>
+                <div id="plan-days-container" class="space-y-6">
+                    <!-- Dynamic day cards will be injected here -->
+                </div>
+                <button id="add-day-btn" class="mt-6 w-full text-center py-2 px-4 border-2 border-dashed border-gray-600 hover:bg-gray-700 hover:border-gray-500 rounded-lg transition-colors duration-200">
+                    + Add Day
+                </button>
+            </div>
+            <div class="p-4 bg-gray-900/50 flex justify-end gap-4 border-t border-gray-700">
+                <button id="cancel-plan-btn" class="px-6 py-2 bg-gray-600 hover:bg-gray-700 rounded-md font-semibold">Cancel</button>
+                <button id="save-plan-btn" class="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-md font-semibold">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "dummy", authDomain: "dummy.firebaseapp.com", projectId: "dummy" };
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : undefined;
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        setLogLevel('debug');
+
+        let userId = null;
+        let isAuthReady = false;
+        let currentDate = new Date();
+        let currentPlan = null;
+
+        const defaultPlan = {
+            name: '4-Day Upper/Lower Split',
+            days: [
+                { title: 'Upper A', exercises: [{ name: 'Barbell Bench Press', target: '4×5–6' }, { name: 'Chest-Supported Row', target: '4×6' }, { name: 'Seated DB Shoulder Press', target: '3×8' }, { name: 'Lat Pulldown (Wide Grip)', target: '3×10' }, { name: 'Cable Chest Fly', target: '2×12' }, { name: 'Barbell or DB Biceps Curl', target: '3×10–12' }, { name: 'Core: Plank', target: '3×30–60 sec' }] },
+                { title: 'Lower A', exercises: [{ name: 'Back Squat', target: '4×5' }, { name: 'Bulgarian Split Squat (DB)', target: '3×8/leg' }, { name: 'Romanian Deadlift (Barbell)', target: '3×8' }, { name: 'Leg Curl (Machine)', target: '3×10–12' }, { name: 'Standing Calf Raise', target: '3×12–15' }, { name: 'Core: Hanging Leg Raise', target: '3×AMAP' }] },
+                { title: 'Upper B', exercises: [{ name: 'Overhead Barbell Press', target: '4×6' }, { name: 'Weighted Pull-Up or Lat Pulldown', target: '4×6' }, { name: 'Incline DB Bench Press', target: '3×8–10' }, { name: 'One-Arm DB Row (Supported)', target: '3×10/arm' }, { name: 'Lateral Raise (DB/Cable)', target: '3×12' }, { name: 'Triceps Pushdown', target: '3×12' }] },
+                { title: 'Lower B', exercises: [{ name: 'Deadlift (Conventional)', target: '3×5' }, { name: 'Leg Press', target: '3×10' }, { name: 'Hip Thrust (Barbell)', target: '3×8' }, { name: 'Leg Extension (Machine)', target: '2×12' }, { name: 'Seated Calf Raise', target: '3×15' }, { name: 'Core: Hanging Leg Raise or Cable Woodchop', target: '3×10' }] },
+            ]
+        };
+
+        const UI = {
+            workoutGrid: document.getElementById('workout-grid'),
+            weekTitle: document.getElementById('week-title'),
+            weekDates: document.getElementById('week-dates'),
+            prevWeekBtn: document.getElementById('prev-week'),
+            nextWeekBtn: document.getElementById('next-week'),
+            saveDataBtn: document.getElementById('save-data'),
+            statusMessage: document.getElementById('status-message'),
+            loader: document.getElementById('loader'),
+            userIdContainer: document.getElementById('user-id-container'),
+            planNameHeader: document.getElementById('plan-name-header'),
+            // Modal
+            editPlanBtn: document.getElementById('edit-plan-btn'),
+            planEditorModal: document.getElementById('plan-editor-modal'),
+            planNameInput: document.getElementById('plan-name-input'),
+            planDaysContainer: document.getElementById('plan-days-container'),
+            addDayBtn: document.getElementById('add-day-btn'),
+            cancelPlanBtn: document.getElementById('cancel-plan-btn'),
+            savePlanBtn: document.getElementById('save-plan-btn'),
+        };
+
+        const getWeekNumber = d => (d=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())),d.setUTCDate(d.getUTCDate()+4-(d.getUTCDay()||7)),Math.ceil((((d-new Date(Date.UTC(d.getUTCFullYear(),0,1)))/864e5)+1)/7));
+        const getWeekDateRange = date => {
+            const start = new Date(date);
+            start.setDate(start.getDate()-start.getDay()+(start.getDay()===0?-6:1));
+            const end = new Date(start);
+            end.setDate(start.getDate()+6);
+            const opts={month:'short',day:'numeric'};
+            return `${start.toLocaleDateString('en-US',opts)} - ${end.toLocaleDateString('en-US',opts)}`;
+        };
+
+        const renderWorkoutDay = (day, dayData = {}) => {
+            const dayId = day.title.replace(/\s+/g, '-');
+            const exerciseHTML = day.exercises.map((exercise, index) => {
+                const numSets = parseInt(exercise.target.split('×')[0], 10) || 1;
+                const exerciseData = dayData[exercise.name] || {};
+                let setsHTML = Array.from({ length: numSets }, (_, i) => {
+                    const setData = exerciseData.sets && exerciseData.sets[i] ? exerciseData.sets[i] : { weight: '', reps: '' };
+                    return `
+                        <div class="grid grid-cols-3 gap-2 items-center">
+                            <span class="text-sm text-gray-400 text-center font-medium">Set ${i + 1}</span>
+                            <input type="text" placeholder="kg/lbs" data-set-prop="weight" value="${setData.weight}" class="form-input bg-gray-700 border-gray-600 rounded-md p-2 text-center text-sm w-full">
+                            <input type="text" placeholder="reps" data-set-prop="reps" value="${setData.reps}" class="form-input bg-gray-700 border-gray-600 rounded-md p-2 text-center text-sm w-full">
+                        </div>`;
+                }).join('');
+                return `
+                    <div class="py-3 border-b border-gray-700 last:border-b-0" data-exercise-name="${exercise.name}">
+                        <div class="flex justify-between items-center mb-2">
+                           <h4 class="font-semibold text-white">${exercise.name}</h4>
+                           <span class="text-sm font-mono bg-gray-700 px-2 py-1 rounded">${exercise.target}</span>
+                        </div>
+                        <div class="space-y-2 pl-2">${setsHTML}</div>
+                    </div>`;
+            }).join('');
+
+            return `<div id="${dayId}" class="bg-gray-800 p-4 rounded-lg shadow-lg" data-day-title="${day.title}"><h3 class="text-lg font-bold mb-4 text-indigo-400 border-b border-gray-700 pb-2">${day.title}</h3><div class="space-y-2">${exerciseHTML}</div></div>`;
+        };
+
+        const renderWeek = (weekData) => {
+            UI.workoutGrid.innerHTML = '';
+            UI.planNameHeader.textContent = currentPlan.name;
+            if (currentPlan && currentPlan.days) {
+                currentPlan.days.forEach(day => {
+                    const dayKey = day.title.replace(/\s+/g, '');
+                    const dayData = weekData[dayKey] || {};
+                    UI.workoutGrid.innerHTML += renderWorkoutDay(day, dayData);
+                });
+            }
+        };
+
+        const updateUIForDate = async () => {
+            if (!isAuthReady || !userId || !currentPlan) return;
+            UI.loader.classList.remove('hidden');
+            UI.workoutGrid.classList.add('hidden');
+
+            const year = currentDate.getFullYear();
+            const week = getWeekNumber(currentDate);
+            UI.weekTitle.textContent = `Week ${week}, ${year}`;
+            UI.weekDates.textContent = getWeekDateRange(currentDate);
+
+            try {
+                const docRef = doc(db, `artifacts/${appId}/users/${userId}/workoutLogs`, `week_${year}_${week}`);
+                const docSnap = await getDoc(docRef);
+                renderWeek(docSnap.exists() ? docSnap.data() : {});
+            } catch (error) {
+                console.error("Error loading week data:", error);
+                UI.statusMessage.textContent = 'Error loading data.';
+                UI.statusMessage.className = 'text-center mb-4 h-6 text-red-500';
+                renderWeek({});
+            } finally {
+                UI.loader.classList.add('hidden');
+                UI.workoutGrid.classList.remove('hidden');
+            }
+        };
+
+        const saveData = async () => {
+            if (!userId) {
+                UI.statusMessage.textContent = 'You must be logged in to save data.';
+                return;
+            }
+            UI.statusMessage.textContent = 'Saving...';
+            UI.statusMessage.className = 'text-center mb-4 h-6 text-blue-400';
+
+            const year = currentDate.getFullYear();
+            const week = getWeekNumber(currentDate);
+            const docId = `week_${year}_${week}`;
+            const dataToSave = { year, week };
+
+            document.querySelectorAll('#workout-grid > div').forEach(dayEl => {
+                const dayKey = dayEl.dataset.dayTitle.replace(/\s+/g, '');
+                dataToSave[dayKey] = {};
+                dayEl.querySelectorAll('[data-exercise-name]').forEach(exEl => {
+                    const exName = exEl.dataset.exerciseName;
+                    dataToSave[dayKey][exName] = { sets: [] };
+                    exEl.querySelectorAll('.grid.grid-cols-3').forEach(setEl => {
+                        const weight = setEl.querySelector('[data-set-prop="weight"]').value;
+                        const reps = setEl.querySelector('[data-set-prop="reps"]').value;
+                        dataToSave[dayKey][exName].sets.push({ weight, reps });
+                    });
+                });
+            });
+
+            try {
+                await setDoc(doc(db, `artifacts/${appId}/users/${userId}/workoutLogs`, docId), dataToSave, { merge: true });
+                UI.statusMessage.textContent = 'Progress saved successfully!';
+                UI.statusMessage.className = 'text-center mb-4 h-6 text-green-500';
+            } catch (error) {
+                console.error("Error saving data:", error);
+                UI.statusMessage.textContent = 'Failed to save data.';
+                UI.statusMessage.className = 'text-center mb-4 h-6 text-red-500';
+            }
+            setTimeout(() => { UI.statusMessage.textContent = '' }, 3000);
+        };
+        
+        const loadPlan = async () => {
+             if (!userId) return;
+             try {
+                 const docRef = doc(db, `artifacts/${appId}/users/${userId}/workoutPlans`, 'mainPlan');
+                 const docSnap = await getDoc(docRef);
+                 currentPlan = docSnap.exists() ? docSnap.data() : defaultPlan;
+             } catch(error) {
+                 console.error("Could not load plan, using default.", error);
+                 currentPlan = defaultPlan;
+             }
+             await updateUIForDate();
+        };
+
+        // Plan Editor Functions
+        const openPlanEditor = () => {
+            UI.planNameInput.value = currentPlan.name;
+            UI.planDaysContainer.innerHTML = '';
+            currentPlan.days.forEach(day => addDayToEditor(day));
+            UI.planEditorModal.classList.remove('hidden');
+        };
+
+        const closePlanEditor = () => UI.planEditorModal.classList.add('hidden');
+
+        const savePlan = async () => {
+            const newPlan = {
+                name: UI.planNameInput.value.trim() || 'My Workout Plan',
+                days: []
+            };
+
+            UI.planDaysContainer.querySelectorAll('.day-card').forEach(dayCard => {
+                const day = {
+                    title: dayCard.querySelector('.day-title-input').value.trim() || 'New Day',
+                    exercises: []
+                };
+                dayCard.querySelectorAll('.exercise-row').forEach(exRow => {
+                    day.exercises.push({
+                        name: exRow.querySelector('.exercise-name-input').value.trim() || 'New Exercise',
+                        target: exRow.querySelector('.exercise-target-input').value.trim() || '3x10'
+                    });
+                });
+                newPlan.days.push(day);
+            });
+
+            try {
+                await setDoc(doc(db, `artifacts/${appId}/users/${userId}/workoutPlans`, 'mainPlan'), newPlan);
+                currentPlan = newPlan;
+                closePlanEditor();
+                await updateUIForDate(); // Re-render main grid
+            } catch (error) {
+                console.error("Error saving plan:", error);
+                alert("Could not save plan. Please try again.");
+            }
+        };
+
+        const addExerciseToEditor = (container, exercise = { name: '', target: ''}) => {
+             const div = document.createElement('div');
+             div.className = 'exercise-row flex items-center gap-2';
+             div.innerHTML = `
+                <input type="text" class="exercise-name-input editor-input flex-1 bg-gray-600 rounded px-2 py-1 text-sm" placeholder="Exercise Name" value="${exercise.name}">
+                <input type="text" class="exercise-target-input editor-input w-24 bg-gray-600 rounded px-2 py-1 text-sm" placeholder="Sets×Reps" value="${exercise.target}">
+                <button class="delete-exercise-btn text-red-400 hover:text-red-300">&times;</button>
+             `;
+             container.appendChild(div);
+        };
+        
+        const addDayToEditor = (day = { title: '', exercises: [{ name: '', target: ''}] }) => {
+            const dayCard = document.createElement('div');
+            dayCard.className = 'day-card bg-gray-700 p-4 rounded-lg';
+            dayCard.innerHTML = `
+                <div class="flex justify-between items-center mb-3">
+                    <input type="text" class="day-title-input editor-input text-lg font-bold bg-transparent w-full" placeholder="Day Title, e.g., Upper Body" value="${day.title}">
+                    <button class="delete-day-btn text-red-400 hover:text-red-300 font-bold text-xl">&times;</button>
+                </div>
+                <div class="exercises-container space-y-2"></div>
+                <button class="add-exercise-btn mt-3 w-full text-sm text-center py-1 px-2 border border-dashed border-gray-500 hover:bg-gray-600 rounded transition-colors">
+                    + Add Exercise
+                </button>
+            `;
+            const exercisesContainer = dayCard.querySelector('.exercises-container');
+            day.exercises.forEach(ex => addExerciseToEditor(exercisesContainer, ex));
+            UI.planDaysContainer.appendChild(dayCard);
+        };
+        
+        // Event Listeners
+        UI.prevWeekBtn.addEventListener('click', () => (currentDate.setDate(currentDate.getDate() - 7), updateUIForDate()));
+        UI.nextWeekBtn.addEventListener('click', () => (currentDate.setDate(currentDate.getDate() + 7), updateUIForDate()));
+        UI.saveDataBtn.addEventListener('click', saveData);
+        UI.editPlanBtn.addEventListener('click', openPlanEditor);
+        UI.cancelPlanBtn.addEventListener('click', closePlanEditor);
+        UI.savePlanBtn.addEventListener('click', savePlan);
+        UI.addDayBtn.addEventListener('click', () => addDayToEditor());
+        
+        UI.planDaysContainer.addEventListener('click', e => {
+            if (e.target.matches('.add-exercise-btn')) {
+                addExerciseToEditor(e.target.previousElementSibling);
+            }
+            if (e.target.matches('.delete-exercise-btn')) {
+                e.target.closest('.exercise-row').remove();
+            }
+            if (e.target.matches('.delete-day-btn')) {
+                e.target.closest('.day-card').remove();
+            }
+        });
+
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                userId = user.uid;
+                isAuthReady = true;
+                UI.userIdContainer.textContent = `User ID: ${userId}`;
+                await loadPlan();
+            } else {
+                userId = null;
+                isAuthReady = false;
+                UI.workoutGrid.innerHTML = `<div class="col-span-full text-center p-8 bg-gray-800 rounded-lg"><p class="text-gray-400">Please wait, authenticating...</p></div>`;
+            }
+        });
+
+        const init = async () => {
+            try {
+                if (initialAuthToken) await signInWithCustomToken(auth, initialAuthToken);
+                else await signInAnonymously(auth);
+            } catch (error) {
+                console.error("Authentication failed:", error);
+                UI.workoutGrid.innerHTML = `<div class="col-span-full text-center p-8 bg-gray-800 rounded-lg"><p class="text-red-500">Authentication failed.</p></div>`;
+                 UI.loader.classList.add('hidden');
+            }
+        };
+
+        init();
+    </script>
+
+</body>
+</html>
+
